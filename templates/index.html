@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时语音识别</title>
+    <style>
+        .highlight {
+            background-color: yellow;
+        }
+        #keywords {
+            margin-top: 10px;
+        }
+        .keyword {
+            display: inline-block;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            padding: 5px;
+            margin-right: 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>实时语音识别</h1>
+    <input type="text" id="keywordInput" placeholder="输入关键词">
+    <button id="addKeywordButton">添加关键词</button>
+    <button id="startButton">开始</button>
+    <button id="stopButton">停止</button>
+    <div id="keywords"></div>
+    <div id="output"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
+        var isRunning = false;
+        var keywords = [];
+
+        document.getElementById("startButton").addEventListener("click", function() {
+            if (!isRunning) {
+                isRunning = true;
+                socket.emit('start');
+                console.log("WebSocket已连接");
+            }
+        });
+
+        document.getElementById("stopButton").addEventListener("click", function() {
+            if (isRunning) {
+                isRunning = false;
+                socket.emit('stop');
+            }
+        });
+        //添加关键词
+        document.getElementById("addKeywordButton").addEventListener("click", function() {
+            var keyword = document.getElementById("keywordInput").value;
+            if (keyword.trim() !== '') {
+                keywords.push(keyword);
+                //返回给后端
+                socket.emit('add_keyword', { keyword: keyword });
+                // 在前端代码中监听 keyword_added 事件
+                //监听关键词添加事件
+                socket.on('keyword_added', function(data) {
+                    var keyword = data.keyword;
+                    console.log('关键词已添加:', keyword);
+                });
+
+                updateKeywordsDisplay();
+                document.getElementById("keywordInput").value = ''; // 清空输入框
+            }
+        });
+
+        socket.on('result', function(result) {
+            var outputDiv = document.getElementById("output");
+            var highlightedResult = highlightKeywords(result, keywords);
+            outputDiv.innerHTML += highlightedResult + "<br>";
+        });
+
+        socket.on('close', function() {
+            console.log("WebSocket连接已关闭");
+        });
+
+        function updateKeywordsDisplay() {
+            var keywordsDiv = document.getElementById("keywords");
+            keywordsDiv.innerHTML = ''; // 清空关键词区域
+            keywords.forEach(function(keyword) {
+                var keywordSpan = document.createElement('span');
+                keywordSpan.className = 'keyword';
+                keywordSpan.textContent = keyword;
+                keywordsDiv.appendChild(keywordSpan);
+            });
+        }
+
+        function highlightKeywords(text, keywords) {
+            var highlightedText = text;
+            keywords.forEach(function(keyword) {
+                var regex = new RegExp(keyword, 'gi');
+                highlightedText = highlightedText.replace(regex, '<span class="highlight">$&</span>');
+            });
+            return highlightedText;
+        }
+    </script>
+</body>
+</html>
